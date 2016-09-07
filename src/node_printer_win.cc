@@ -9,11 +9,18 @@
 #error "Unsupported compiler for windows. Feel free to add it."
 #endif
 
+#include <minmax.h>
+#include <gdiplus.h>
+#pragma comment( lib, "gdiplus.lib" )
+
+#include <tchar.h>
+
 #include <string>
 #include <map>
 #include <utility>
 #include <sstream>
 #include <node_version.h>
+#include <iostream>
 
 namespace{
     typedef std::map<std::string, DWORD> StatusMapType;
@@ -275,12 +282,12 @@ namespace{
      * Returns last error code and message string
      */
     std::string getLastErrorCodeAndMessage() {
-    	std::ostringstream s;
-    	DWORD erroCode = GetLastError();
-    	s << "code: " << erroCode;
-    	DWORD retSize;
-    	LPTSTR pTemp = NULL;
-    	retSize = FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER|
+        std::ostringstream s;
+        DWORD erroCode = GetLastError();
+        s << "code: " << erroCode;
+        DWORD retSize;
+        LPTSTR pTemp = NULL;
+        retSize = FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER|
                                 FORMAT_MESSAGE_FROM_SYSTEM|
                                 FORMAT_MESSAGE_ARGUMENT_ARRAY,
                                 NULL,
@@ -290,14 +297,14 @@ namespace{
                                 0,
                                 NULL );
         if (retSize && pTemp != NULL) {
-	    //pTemp[strlen(pTemp)-2]='\0'; //remove cr and newline character
-	    //TODO: check if it is needed to convert c string to std::string
-	    std::string stringMessage(pTemp);
-	    s << ", message: " << stringMessage;
-	    LocalFree((HLOCAL)pTemp);
-	}
+        //pTemp[strlen(pTemp)-2]='\0'; //remove cr and newline character
+        //TODO: check if it is needed to convert c string to std::string
+        std::string stringMessage(pTemp);
+        s << ", message: " << stringMessage;
+        LocalFree((HLOCAL)pTemp);
+    }
 
-    	return s.str();
+        return s.str();
     }
 
     std::string retrieveAndParseJobs(const LPWSTR iPrinterName,
@@ -429,6 +436,87 @@ namespace{
     }
 }
 
+LPDEVMODEW GetLandscapeDevMode(HWND hWnd, LPWSTR pDevice)
+{
+
+   HANDLE      hPrinter;
+   LPDEVMODEW   pDevMode;
+   DWORD       dwNeeded, dwRet;
+
+   /* Start by opening the printer */ 
+   if (!OpenPrinterW(pDevice, &hPrinter, NULL))
+       return NULL;
+
+   /*
+    * Step 1:
+    * Allocate a buffer of the correct size.
+    */ 
+   dwNeeded = DocumentPropertiesW(hWnd,
+       hPrinter,       /* Handle to our printer. */ 
+       pDevice,        /* Name of the printer. */ 
+       NULL,           /* Asking for size, so */ 
+       NULL,           /* these are not used. */ 
+       0);             /* Zero returns buffer size. */ 
+   pDevMode = (LPDEVMODEW)malloc(dwNeeded);
+
+   /*
+    * Step 2:
+    * Get the default DevMode for the printer and
+    * modify it for your needs.
+    */ 
+   dwRet = DocumentPropertiesW(hWnd,
+       hPrinter,
+       pDevice,
+       pDevMode,       /* The address of the buffer to fill. */ 
+       NULL,           /* Not using the input buffer. */ 
+       DM_OUT_BUFFER); /* Have the output buffer filled. */ 
+   if (dwRet != IDOK)
+   {
+       /* If failure, cleanup and return failure. */ 
+       free(pDevMode);
+       ClosePrinter(hPrinter);
+       return NULL;
+   }
+
+   /*
+        * Make changes to the DevMode which are supported.
+    */ 
+   if (pDevMode->dmFields & DM_ORIENTATION)
+   {
+       /* If the printer supports paper orientation, set it.*/ 
+       pDevMode->dmOrientation = DMORIENT_LANDSCAPE;
+   }
+
+
+   /*
+    * Step 3:
+    * Merge the new settings with the old.
+    * This gives the driver an opportunity to update any private
+    * portions of the DevMode structure.
+    */ 
+    dwRet = DocumentPropertiesW(hWnd,
+       hPrinter,
+       pDevice,
+       pDevMode,       /* Reuse our buffer for output. */ 
+       pDevMode,       /* Pass the driver our changes. */ 
+       DM_IN_BUFFER |  /* Commands to Merge our changes and */ 
+       DM_OUT_BUFFER); /* write the result. */ 
+
+   /* Finished with the printer */ 
+   ClosePrinter(hPrinter);
+
+   if (dwRet != IDOK)
+   {
+       /* If failure, cleanup and return failure. */ 
+       free(pDevMode);
+       return NULL;
+   }
+
+   /* Return the modified DevMode structure. */ 
+   return pDevMode;
+
+}
+
 MY_NODE_MODULE_CALLBACK(getPrinters)
 {
     MY_NODE_MODULE_HANDLESCOPE;
@@ -449,13 +537,13 @@ MY_NODE_MODULE_CALLBACK(getPrinters)
     if(!bError)
     {
         std::string error_str("Error on EnumPrinters: ");
-	error_str += getLastErrorCodeAndMessage();
+    error_str += getLastErrorCodeAndMessage();
         RETURN_EXCEPTION_STR(error_str.c_str());
     }
     v8::Local<v8::Array> result = V8_VALUE_NEW_V_0_11_10(Array, printers_size);
     // http://msdn.microsoft.com/en-gb/library/windows/desktop/dd162845(v=vs.85).aspx
-	PRINTER_INFO_2W *printer = printers.get();
-	DWORD i = 0;
+    PRINTER_INFO_2W *printer = printers.get();
+    DWORD i = 0;
     for(; i < printers_size; ++i, ++printer)
     {
         v8::Local<v8::Object> result_printer = V8_VALUE_NEW_DEFAULT_V_0_11_10(Object);
@@ -516,7 +604,7 @@ MY_NODE_MODULE_CALLBACK(getPrinter)
     if(!bOK)
     {
         std::string error_str("Error on GetPrinter: ");
-	error_str += getLastErrorCodeAndMessage();
+    error_str += getLastErrorCodeAndMessage();
         RETURN_EXCEPTION_STR(error_str.c_str());
     }
     v8::Local<v8::Object> result_printer = V8_VALUE_NEW_DEFAULT_V_0_11_10(Object);
@@ -550,7 +638,7 @@ MY_NODE_MODULE_CALLBACK(getJob)
     if(!printerHandle)
     {
         std::string error_str("error on PrinterHandle: ");
-	error_str += getLastErrorCodeAndMessage();
+    error_str += getLastErrorCodeAndMessage();
         RETURN_EXCEPTION_STR(error_str.c_str());
     }
     DWORD size_bytes = 0, dummyBytes = 0;
@@ -564,7 +652,7 @@ MY_NODE_MODULE_CALLBACK(getJob)
     if(!bOK)
     {
         std::string error_str("Error on GetJob. Wrong job id or it was deleted: ");
-	error_str += getLastErrorCodeAndMessage();
+    error_str += getLastErrorCodeAndMessage();
         RETURN_EXCEPTION_STR(error_str.c_str());
     }
     v8::Local<v8::Object> result_printer_job = V8_VALUE_NEW_DEFAULT_V_0_11_10(Object);
@@ -716,14 +804,14 @@ MY_NODE_MODULE_CALLBACK(PrintDirect)
             EndPagePrinter(*printerHandle);
         }else{
             std::string error_str("StartPagePrinter error: ");
-    	    error_str += getLastErrorCodeAndMessage();
+            error_str += getLastErrorCodeAndMessage();
             RETURN_EXCEPTION_STR(error_str.c_str());
         }
         // Inform the spooler that the document is ending.
         EndDocPrinter(*printerHandle);
     }else{
-    	std::string error_str("StartDocPrinterW error: ");
-    	error_str += getLastErrorCodeAndMessage();
+        std::string error_str("StartDocPrinterW error: ");
+        error_str += getLastErrorCodeAndMessage();
         RETURN_EXCEPTION_STR(error_str.c_str());
     }
     // Check to see if correct number of bytes were written.
@@ -735,6 +823,146 @@ MY_NODE_MODULE_CALLBACK(PrintDirect)
 
 MY_NODE_MODULE_CALLBACK(PrintFile)
 {
+
+    wchar_t   szDriver[16] = L"WINSPOOL";
+    wchar_t   *szPrinter = NULL;
+    DWORD   cchBuffer = 255;
+    DWORD      dwJob = 0L;
+    HDC  hdcPrint = NULL;
+    HANDLE  hPrinter = NULL;
+    PRINTER_INFO_2W  *pPrinterData;
+    DEVMODEW* landscapeDevMode = NULL;
+    BYTE    pdBuffer[16384];
+    BOOL    bReturn = TRUE;
+    BOOL    bLandscapeMode = FALSE;
+
+    static OPENFILENAME ofn;
+    char szFileName[500] = "\0";
+    HBITMAP hBitmap = NULL;
+    BITMAP iBmp;
+    int bxWidth, bxHeight, flag = 0;
+    HDC hdcMem;
+    int cxsize = 0, cxpage = 0;
+    int cysize = 0, cypage = 0;
+
+    DWORD   cbBuf = sizeof(pdBuffer);
+    DWORD   cbNeeded = 0;
+
+    pPrinterData = (PRINTER_INFO_2W *)&pdBuffer[0];
+
+
     MY_NODE_MODULE_HANDLESCOPE;
-    RETURN_EXCEPTION_STR("Not yet implemented on Windows");
+    REQUIRE_ARGUMENTS(iArgs, 3);
+
+    // can be string or buffer
+    if(iArgs.Length() <= 0)
+    {
+        RETURN_EXCEPTION_STR("Argument 0 missing");
+    }
+
+    REQUIRE_ARGUMENT_STRINGW(iArgs, 0, filename);
+    REQUIRE_ARGUMENT_STRINGW(iArgs, 1, docname);
+    REQUIRE_ARGUMENT_STRINGW(iArgs, 2, printer);
+    REQUIRE_ARGUMENT_OBJECT(iArgs, 3, print_options);
+
+    if (print_options->Has(V8_STRING_NEW_UTF8("orientation"))) {
+        v8::String::Value orientationVal(print_options->Get(V8_STRING_NEW_UTF8("orientation"))->ToString());
+        if (wcscmp((wchar_t *)(*orientationVal),L"L") == 0) {
+            bLandscapeMode = TRUE;
+        }
+    }
+
+
+    std::string data;
+    //v8::Handle<v8::Value> arg0(iArgs[0]);
+
+    szPrinter = (LPWSTR)(*printer);
+
+    // open the default printer
+    bReturn = OpenPrinterW(
+        szPrinter,
+        &hPrinter,
+        NULL);
+
+    if (bReturn) {
+        // get the printer port name
+        bReturn = GetPrinterW(
+            hPrinter,
+            2,
+            &pdBuffer[0],
+            cbBuf,
+            &cbNeeded);
+
+        // this handle is no longer needed
+        ClosePrinter(hPrinter);
+
+    } else {
+        RETURN_EXCEPTION_STR("OpenPrinter error : unable to open the printer");
+    }
+
+    if (bReturn) {
+        //std::wcout << "\n Create  : " << pPrinterData->pPortName  << "\n";
+        // Create Device Context on the printer
+        if (bLandscapeMode) {
+            landscapeDevMode = GetLandscapeDevMode(NULL, szPrinter);
+        }
+        hdcPrint = CreateDCW(szDriver, szPrinter, pPrinterData->pPortName, landscapeDevMode);
+    } else {
+        RETURN_EXCEPTION_STR("GetPrinter error : unable to get the printer port name");
+    }
+
+
+    if (hdcPrint) {
+        // Gdiplus initialization
+        Gdiplus::GdiplusStartupInput gdiplusStartupInput;
+        ULONG_PTR gdiplusToken;
+        Gdiplus::GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL);
+
+        // The graphics file formats supported by GDI+ are BMP, GIF, JPEG, PNG, TIFF, Exif, WMF, and EMF.
+        Gdiplus::Bitmap* oBmp = Gdiplus::Bitmap::FromFile((LPWSTR)(*filename), false);
+        oBmp->GetHBITMAP( Gdiplus::Color::White, &hBitmap);
+
+        //hBitmap = (HBITMAP)LoadImageW(NULL, (LPWSTR)(*filename), IMAGE_BITMAP, 0, 0, LR_CREATEDIBSECTION | LR_DEFAULTSIZE | LR_LOADFROMFILE | LR_VGACOLOR);
+        if (hBitmap) {
+            //cxpage = GetDeviceCaps(hdcPrint, HORZRES);
+            //cypage = GetDeviceCaps(hdcPrint, VERTRES);
+            GetObjectW(hBitmap, sizeof(BITMAP), &iBmp);
+            bxWidth = iBmp.bmWidth;
+            bxHeight = iBmp.bmHeight;
+
+        } else {
+            RETURN_EXCEPTION_STR("LoadImage error : unable to load image");
+        }
+
+        DOCINFOW di = { sizeof(DOCINFOW), (LPWSTR)(*docname) };
+
+        cxpage = GetDeviceCaps(hdcPrint, HORZRES);
+        cypage = GetDeviceCaps(hdcPrint, VERTRES);
+        hdcMem = CreateCompatibleDC(hdcPrint);
+        HBITMAP hbmOld = (HBITMAP)SelectObject(hdcMem, hBitmap);
+
+        dwJob = StartDocW(hdcPrint, &di);
+        // @TODO: check value of dwJob
+        StartPage(hdcPrint);
+
+        SetMapMode(hdcPrint, MM_ISOTROPIC);
+
+        SetWindowExtEx(hdcPrint, cxpage, cypage, NULL);
+        SetViewportExtEx(hdcPrint, cxpage, cypage, NULL);
+        SetViewportOrgEx(hdcPrint, 0, 0, NULL);
+
+        StretchBlt(hdcPrint, 0, 0, cxpage, cypage, hdcMem, 0, 0, bxWidth, bxHeight, SRCCOPY);
+
+        EndPage(hdcPrint);
+        EndDoc(hdcPrint);
+        DeleteDC(hdcPrint);
+        SelectObject(hdcMem, hbmOld);
+        DeleteDC(hdcMem);
+        Gdiplus::GdiplusShutdown(gdiplusToken);
+    } else {
+        RETURN_EXCEPTION_STR("CreateDC error : unable to create device instance");
+    }
+
+    MY_NODE_MODULE_RETURN_VALUE(V8_VALUE_NEW(Number, dwJob));
+
 }
