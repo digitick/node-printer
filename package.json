@@ -2,7 +2,7 @@
   "name": "printer",
   "description": "Node.js printer bindings",
   "version": "0.2.1",
-  "homepage": "http://github.com/tojocky/node-printer",
+  "homepage": "http://github.com/digitick/node-printer",
   "author": {
     "name": "Ion Lupascu",
     "url": "http://program-support.co.uk/",
@@ -13,7 +13,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git://github.com/tojocky/node-printer.git"
+    "url": "git://github.com/digitick/node-printer.git"
   },
   "devDependencies": {
     "grunt": "^0.4.5",
@@ -27,6 +27,14 @@
     "node": ">= 0.8.0"
   },
   "scripts": {
+    "preinstall": "npm install node-pre-gyp",
+    "install": "node-pre-gyp install --fallback-to-build"
+  },
+  "binary": {
+    "module_name": "printer",
+    "module_path": "./lib/dist/{configuration}/{node_abi}-{platform}-{arch}/",
+    "host": "https://github.com/digitick/node-printer/releases/download/",
+    "remote_path": "{version}"
   },
   "licenses": [
     {
