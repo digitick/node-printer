@@ -958,6 +958,8 @@ MY_NODE_MODULE_CALLBACK(PrintFile)
         DeleteDC(hdcPrint);
         SelectObject(hdcMem, hbmOld);
         DeleteDC(hdcMem);
+        delete oBmp;
+        oBmp = NULL;
         Gdiplus::GdiplusShutdown(gdiplusToken);
     } else {
         RETURN_EXCEPTION_STR("CreateDC error : unable to create device instance");
