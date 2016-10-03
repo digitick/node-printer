@@ -32,7 +32,7 @@
   },
   "binary": {
     "module_name": "printer",
-    "module_path": "./lib/dist/{configuration}/{node_abi}-{platform}-{arch}/",
+    "module_path": "./lib/dist/",
     "host": "https://github.com/digitick/node-printer/releases/download/",
     "remote_path": "{version}"
   },
