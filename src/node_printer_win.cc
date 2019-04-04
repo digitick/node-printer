@@ -832,7 +832,7 @@ MY_NODE_MODULE_CALLBACK(PrintFile)
     HANDLE  hPrinter = NULL;
     PRINTER_INFO_2W  *pPrinterData;
     DEVMODEW* landscapeDevMode = NULL;
-    BYTE    pdBuffer[16384];
+    BYTE    pdBuffer[65536];
     BOOL    bReturn = TRUE;
     BOOL    bLandscapeMode = FALSE;
 
